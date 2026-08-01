@@ -161,8 +161,3 @@ A team's real offense/defense shifts some max numbers automatically:
 - **FB can't be fully fixed** — see the table note above.
 - **Your own team's numbers can occasionally be wrong** because of something in the game's own data, unrelated to this tool (confirmed once on a real save: some of a user's real players were tagged as belonging to a completely different team internally). Because of this, your team is left out of the Season History totals, and a warning shows up if you scan your own team on the Current Snapshot tab.
 - **Needs a specific version of the `madden-franchise` library** (loaded a slightly unusual way) because the version needed for CFB 27's current patch wasn't available the normal way at the time this was built.
-
-## Credits
-
-- Built on [`madden-franchise`](https://github.com/bep713/madden-franchise) by bep713.
-- The way Roster/DepthChart data gets fixed after a move (treat TeamIndex as the source of truth, then rebuild everything else from that) is based on the approach used in PocketScout Utilities.
