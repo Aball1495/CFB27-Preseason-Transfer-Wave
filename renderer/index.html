@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Preseason Transfer Wave</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="title-block">
+        <h1>Preseason Transfer Wave</h1>
+        <p class="subtitle">Preseason roster redistribution for CFB 27 CPU teams</p>
+      </div>
+      <div class="status-pill" id="status-pill">
+        <span class="dot" id="status-dot"></span>
+        <span id="status-text">Idle</span>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="run">Run</button>
+      <button class="tab-btn" data-tab="settings">Settings</button>
+      <button class="tab-btn" data-tab="history">History</button>
+      <button class="tab-btn" data-tab="health">Team Health</button>
+    </nav>
+
+    <!-- RUN TAB -->
+    <section class="tab-panel active" id="tab-run">
+      <section class="save-picker">
+        <button id="select-save-btn" class="btn btn-secondary">Choose Save File</button>
+        <div class="save-path" id="save-path">No save selected</div>
+      </section>
+
+      <section class="actions">
+        <button id="preview-btn" class="btn btn-primary" disabled>Preview (Dry Run)</button>
+        <button id="apply-btn" class="btn btn-danger" disabled>Apply Changes</button>
+      </section>
+
+      <section class="summary" id="summary" hidden>
+        <div class="summary-card">
+          <div class="summary-value" id="summary-total">0</div>
+          <div class="summary-label">Total Moves</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-value" id="summary-tier1">0</div>
+          <div class="summary-label">Tier 1 (Fill Need)</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-value" id="summary-tier2">0</div>
+          <div class="summary-label">Tier 2 (Trim Surplus)</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-value" id="summary-teams">0</div>
+          <div class="summary-label">Teams Affected</div>
+        </div>
+      </section>
+
+      <section class="log-section">
+        <div class="log-header">
+          <span>Live Log</span>
+          <button id="clear-log-btn" class="btn btn-ghost">Clear</button>
+        </div>
+        <div class="log-panel" id="log-panel"></div>
+      </section>
+    </section>
+
+    <!-- SETTINGS TAB -->
+    <section class="tab-panel" id="tab-settings">
+      <div class="settings-scroll">
+        <h2 class="section-title">Position Thresholds</h2>
+        <p class="section-hint">Min/max per position. Leave at default unless you have a specific reason to change it -- these were calibrated against real league-wide data.</p>
+        <table class="threshold-table" id="threshold-table">
+          <thead><tr><th>Position</th><th>Min</th><th>Max</th><th>Default</th></tr></thead>
+          <tbody id="threshold-table-body"></tbody>
+        </table>
+
+        <h2 class="section-title">Tier 2 Behavior</h2>
+        <p class="section-hint">
+          Every position fill works in two layers. <strong>Tier 1</strong> takes surplus players from teams over their max
+          and hands them to teams under their min — normal, everyday redistribution. <strong>Tier 2</strong> exists for
+          teams hoarding so much at one position that Tier 1 alone won't touch all of it — those extra players get spread
+          out across the league even to teams that aren't technically "in need," so hoarding doesn't just sit there forever.
+        </p>
+        <div class="settings-row checkbox-row">
+          <input type="checkbox" id="enable-tier2-checkbox" />
+          <label for="enable-tier2-checkbox">Enable Tier 2 (force severe hoarders to release surplus even without direct need)</label>
+        </div>
+        <p class="section-hint">
+          Turning this off makes the tool strictly conservative — it will only ever move a player when another team
+          genuinely needs one. Severe hoarders keep everything above their max forever if nobody else is under their min.
+          This is a real philosophy choice, not just a tuning knob: leave it on if you want the league to actively trend
+          toward balance over time, turn it off if you'd rather the tool never touch a team beyond what's strictly required.
+        </p>
+        <div id="tier2-subsettings">
+          <div class="settings-row">
+            <label for="severe-threshold-input">Severe donor threshold (over max by more than):</label>
+            <input type="number" id="severe-threshold-input" min="0" step="1" />
+          </div>
+          <p class="section-hint">
+            A team only qualifies for Tier 2 once it's over its max by <em>more</em> than this number. Example: with a
+            threshold of 2 and a WR max of 10, a team sitting at 12 WRs is fine (Tier 1 territory), but a team sitting at 14
+            is now "severe" — Tier 2 forces some of that excess out even if no other team currently needs a WR.
+          </p>
+          <div class="settings-row">
+            <label for="small-position-severe-threshold-input">Severe donor threshold for FB / K / P specifically:</label>
+            <input type="number" id="small-position-severe-threshold-input" min="0" step="1" />
+          </div>
+          <p class="section-hint">
+            FB/K/P have such tiny natural ranges (1-2 total) that the general threshold above almost never triggers for
+            them — a team would need 4+ punters before Tier 2 even noticed. This separate, smaller threshold exists so a
+            team hoarding just 1 extra fullback/kicker/punter beyond its max can still get forced to release it, rescuing
+            a team stuck at 0.
+          </p>
+          <div class="settings-row">
+            <label for="prestige-cap-input">Prestige gap cap for Tier 2 moves:</label>
+            <input type="number" id="prestige-cap-input" min="0" step="1" />
+          </div>
+          <p class="section-hint">
+            Tier 2 tries to keep moves realistic — a bench player from a small program shouldn't just teleport onto a
+            national title contender. This caps how much higher-prestige the <em>receiving</em> team can be than the
+            <em>donating</em> team. A player who'd immediately rank in the top 2 at their position on the new team skips
+            this cap entirely (a real, portal-worthy talent upgrade is allowed to jump further than an ordinary depth move).
+          </p>
+        </div>
+
+        <h2 class="section-title">Other Options</h2>
+        <div class="settings-row checkbox-row">
+          <input type="checkbox" id="zero-nil-checkbox" />
+          <label for="zero-nil-checkbox">Zero out NIL value/compensation on moved players</label>
+        </div>
+        <p class="section-hint">
+          When a player moves teams, this resets their NIL value and current compensation to 0 (and clears their NIL
+          flag). The idea: a "free" player is a safer, easier keep for the CPU's own roster-management logic than one
+          still carrying a big NIL number tied to their old team. We haven't been able to prove this actually changes
+          CPU behavior one way or the other — it's a reasonable-sounding safeguard, not a confirmed fix — so it's left
+          as an optional toggle rather than baked in permanently.
+        </p>
+
+        <h2 class="section-title">Playbook Awareness</h2>
+        <p class="section-hint">
+          Every team's actual offensive and defensive playbook shifts a handful of position maximums automatically —
+          the numbers on this page are the <em>baseline</em>, and a team's real effective max can be a little higher or
+          lower depending on scheme. You don't set any of this directly; it's read live from each team's playbook every
+          time the tool runs. A few examples of what that looks like in practice:
+        </p>
+        <ul class="scheme-example-list">
+          <li><strong>Air Raid / Run and Shoot / Veer and Shoot / Spread</strong> (pass-heavy): WR max +1, TE max &minus;1,
+            FB min drops to 0 -- these teams realistically play with more receivers, fewer tight ends, and often no true fullback at all.</li>
+          <li><strong>Power Spread / Spread Option / Pistol / Option</strong> (run-heavy): HB max +1, WR max &minus;1 --
+            more backs to rotate, fewer receivers needed.</li>
+          <li><strong>Base 3-4 / 3-4 Multiple / 3-3-5 / 3-3-5 Tite / 3-2-6</strong> (3-down fronts): DT max &minus;1,
+            LOLB/MLB/ROLB max +1 each -- a 3-4 needs one true nose instead of two full tackles, but a real 4th linebacker.</li>
+          <li><strong>3-3-5 / 3-3-5 Tite / 3-2-6</strong> specifically (extra-DB packages): CB/FS/SS max +1 each -- these
+            fronts trade a lineman for an extra defensive back.</li>
+          <li><strong>Base 4-3 / 4-2-5 / 4-3 Multiple</strong> and <strong>Pro Style / West Coast Zone Run / Multiple Offense</strong>:
+            no delta at all -- these are the baseline the numbers above are already calibrated against.</li>
+        </ul>
+
+        <div class="settings-actions">
+          <button id="save-settings-btn" class="btn btn-primary">Save Settings</button>
+          <button id="reset-settings-btn" class="btn btn-ghost">Reset to Defaults</button>
+          <span id="settings-saved-msg" class="saved-msg" hidden>Saved.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY TAB -->
+    <section class="tab-panel" id="tab-history">
+      <div class="settings-scroll">
+        <div class="history-header-row">
+          <h2 class="section-title" style="margin:0;">Run History</h2>
+          <button id="clear-history-btn" class="btn btn-ghost">Clear All History</button>
+        </div>
+        <p class="section-hint">Every time you click Apply, a record is saved here -- a good way to see whether the league is trending toward balance over time.</p>
+        <div id="history-chart" class="history-chart"></div>
+        <table class="history-table" id="history-table">
+          <thead><tr><th>Date</th><th>Total</th><th>Tier 1</th><th>Tier 2</th><th>Teams Affected</th><th></th></tr></thead>
+          <tbody id="history-table-body"></tbody>
+        </table>
+        <p id="history-empty" class="section-hint" hidden>No runs recorded yet -- click Apply on the Run tab to start tracking history.</p>
+      </div>
+    </section>
+
+    <!-- TEAM HEALTH TAB -->
+    <section class="tab-panel" id="tab-health">
+      <div class="settings-scroll">
+        <h2 class="section-title">Team Health</h2>
+        <p class="section-hint">Read-only snapshot of a team's current position counts against their effective min/max. No moves are made here.</p>
+
+        <nav class="subtabs">
+          <button class="subtab-btn active" data-subtab="snapshot">Current Snapshot</button>
+          <button class="subtab-btn" data-subtab="season-history">Season History</button>
+        </nav>
+
+        <!-- SNAPSHOT SUBTAB -->
+        <div class="subtab-panel active" id="subtab-snapshot">
+          <div class="settings-row">
+            <button id="health-select-save-btn" class="btn btn-secondary">Choose Save File</button>
+            <div class="save-path" id="health-save-path">No save selected</div>
+          </div>
+          <div class="settings-row">
+            <button id="scan-teams-btn" class="btn btn-secondary" disabled>Scan Teams</button>
+            <select id="team-select" disabled><option>Scan first...</option></select>
+          </div>
+          <div id="team-health-header" class="team-health-header" hidden>
+            <img id="team-health-logo" class="team-logo-img" alt="" />
+            <div>
+              <div id="team-health-name" class="team-health-name"></div>
+              <div id="team-health-schemes" class="team-health-schemes"></div>
+            </div>
+          </div>
+          <p id="team-health-user-caveat" class="section-hint" hidden style="color:#fbbf24;">
+            ⚠ This is your own team. On rare saves, the game can mis-tag some of your roster's underlying data in a way
+            that makes these counts unreliable for the human-controlled team specifically -- this is a known game-data
+            quirk, not something this tool causes, and it's excluded from the Season History trend for that reason.
+          </p>
+          <div id="team-health-grid" class="team-health-grid"></div>
+        </div>
+
+        <!-- SEASON HISTORY SUBTAB -->
+        <div class="subtab-panel" id="subtab-season-history">
+          <div class="history-header-row">
+            <p class="section-hint" style="margin:0;">
+              Every time you scan a save on the Current Snapshot tab, the league-wide green/yellow/red totals (across
+              every position of every real team) get recorded here -- a running picture of the whole dynasty's health
+              over time, not just one team at one moment.
+            </p>
+            <button id="clear-health-history-btn" class="btn btn-ghost">Clear All</button>
+          </div>
+          <div id="season-health-chart" class="season-health-chart"></div>
+          <div class="season-health-legend">
+            <span><span class="legend-dot legend-green"></span> Green (healthy)</span>
+            <span><span class="legend-dot legend-yellow"></span> Yellow (over max)</span>
+            <span><span class="legend-dot legend-red"></span> Red (under min)</span>
+          </div>
+          <table class="history-table" id="season-health-table">
+            <thead><tr><th>Date</th><th>Save</th><th>Green</th><th>Yellow</th><th>Red</th><th></th></tr></thead>
+            <tbody id="season-health-table-body"></tbody>
+          </table>
+          <p id="season-health-empty" class="section-hint" hidden>No scans recorded yet -- run a scan on the Current Snapshot tab first.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

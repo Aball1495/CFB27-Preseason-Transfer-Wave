@@ -1,0 +1,32 @@
+{
+  "name": "preseason-transfer-wave",
+  "version": "1.0.0",
+  "description": "Preseason roster redistribution tool for EA Sports College Football 27 CPU teams",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable"
+  },
+  "dependencies": {
+    "madden-franchise": "^4.3.1"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.ball14.preseasontransferwave",
+    "productName": "Preseason Transfer Wave",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!dist/**"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "build/icon.ico"
+    }
+  }
+}

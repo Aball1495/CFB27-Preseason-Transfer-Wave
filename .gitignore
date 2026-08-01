@@ -1,0 +1,17 @@
+# Dependencies -- reinstalled via npm install, never committed
+node_modules/
+
+# electron-builder output -- the actual .exe/zip goes up as a GitHub
+# Release attachment instead, not committed into the repo
+dist/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.log
+
+# Local settings/history the app generates at runtime (lives in the
+# user's AppData, not the project folder, but just in case)
+settings.json
+history.json
+health-history.json
