@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('api', {
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
   getDefaultChecks: () => ipcRenderer.invoke('get-default-checks'),
+  getDefaultSevereThresholds: () => ipcRenderer.invoke('get-default-severe-thresholds'),
   getPositionKeys: () => ipcRenderer.invoke('get-position-keys'),
   getTeamVisuals: () => ipcRenderer.invoke('get-team-visuals'),
   getHistory: () => ipcRenderer.invoke('get-history'),

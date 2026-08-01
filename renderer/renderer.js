@@ -200,13 +200,43 @@ function setButtonsEnabled(enabled) {
   selectSaveBtn.disabled = !enabled;
 }
 
+const preseasonWarning = document.getElementById('preseason-warning');
+const preseasonModalOverlay = document.getElementById('preseason-modal-overlay');
+const preseasonYesBtn = document.getElementById('preseason-yes-btn');
+const preseasonNoBtn = document.getElementById('preseason-no-btn');
+let pendingSavePath = null;
+
 selectSaveBtn.addEventListener('click', async () => {
   const filePath = await window.api.selectSaveFile();
   if (!filePath) return;
-  selectedSavePath = filePath;
-  savePathEl.textContent = filePath;
+  pendingSavePath = filePath;
+  preseasonModalOverlay.hidden = false;
+});
+
+preseasonYesBtn.addEventListener('click', () => {
+  selectedSavePath = pendingSavePath;
+  pendingSavePath = null;
+  savePathEl.textContent = selectedSavePath;
   savePathEl.classList.add('selected');
+  preseasonWarning.hidden = true;
+  preseasonModalOverlay.hidden = true;
   setButtonsEnabled(true);
+});
+
+preseasonNoBtn.addEventListener('click', () => {
+  // Don't carry over any previously-confirmed save -- if they had one
+  // selected and correctly confirmed before, re-picking a file and then
+  // saying "No" here means THIS file isn't preseason-ready, so Preview/
+  // Apply need to go back to disabled rather than staying enabled on the
+  // old path.
+  pendingSavePath = null;
+  selectedSavePath = null;
+  savePathEl.textContent = 'No save selected';
+  savePathEl.classList.remove('selected');
+  preseasonModalOverlay.hidden = true;
+  preseasonWarning.hidden = false;
+  previewBtn.disabled = true;
+  applyBtn.disabled = true;
 });
 
 function startRun(dryRun) {
@@ -262,49 +292,81 @@ window.api.onError((message) => {
 let currentSettings = null;
 let defaultChecks = null;
 
+// Position/group order in the engine's CHECKS table is already grouped
+// this way (QB..C offense, DE..SS defense, K/P special teams) -- this
+// just gives each bucket a label and a target tbody for the collapsible
+// sections.
+const POSITION_GROUPS = [
+  { label: 'offense', keys: ['QB', 'HB', 'FB', 'WR', 'TE', 'OT', 'Guards', 'C'] },
+  { label: 'defense', keys: ['DE', 'DT', 'LOLB', 'MLB', 'ROLB', 'CB', 'FS', 'SS'] },
+  { label: 'special', keys: ['K', 'P'] },
+];
+
+let defaultSevereThresholds = null;
+
 async function loadSettingsUI() {
   currentSettings = await window.api.getSettings();
   defaultChecks = await window.api.getDefaultChecks();
+  defaultSevereThresholds = await window.api.getDefaultSevereThresholds();
   const positionKeys = await window.api.getPositionKeys();
+  const positionKeySet = new Set(positionKeys);
 
-  const tbody = document.getElementById('threshold-table-body');
-  tbody.innerHTML = '';
-  for (const key of positionKeys) {
-    const base = defaultChecks[key];
-    const override = currentSettings.thresholdOverrides[key] || {};
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td>${displayPositionName(key)}</td>
-      <td><input type="number" data-pos="${key}" data-field="min" value="${override.min ?? base.min}" /></td>
-      <td><input type="number" data-pos="${key}" data-field="max" value="${override.max ?? base.max}" /></td>
-      <td class="default-val">${base.min} / ${base.max}</td>
-    `;
-    tbody.appendChild(row);
+  for (const group of POSITION_GROUPS) {
+    const tbody = document.getElementById(`threshold-table-body-${group.label}`);
+    tbody.innerHTML = '';
+    for (const key of group.keys) {
+      if (!positionKeySet.has(key)) continue; // guard against future engine changes to POSITION_KEYS
+      const base = defaultChecks[key];
+      const override = currentSettings.thresholdOverrides[key] || {};
+      const baseSevere = defaultSevereThresholds[key];
+      const severeOverride = currentSettings.severeThresholdOverrides?.[key];
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${displayPositionName(key)}</td>
+        <td><input type="number" data-pos="${key}" data-field="min" value="${override.min ?? base.min}" /></td>
+        <td><input type="number" data-pos="${key}" data-field="max" value="${override.max ?? base.max}" /></td>
+        <td class="severe-threshold-cell"><input type="number" data-pos="${key}" data-field="severe" min="0" step="1" value="${severeOverride ?? baseSevere}" /></td>
+        <td class="default-val">${base.min} / ${base.max} · sev ${baseSevere}</td>
+      `;
+      tbody.appendChild(row);
+    }
   }
 
   document.getElementById('enable-tier2-checkbox').checked = currentSettings.enableTier2;
-  document.getElementById('tier2-subsettings').classList.toggle('disabled', !currentSettings.enableTier2);
-  document.getElementById('severe-threshold-input').value = currentSettings.severeThreshold;
-  document.getElementById('small-position-severe-threshold-input').value = currentSettings.smallPositionSevereThreshold;
+  setTier2Enabled(currentSettings.enableTier2);
   document.getElementById('prestige-cap-input').value = currentSettings.prestigeGapCap;
   document.getElementById('zero-nil-checkbox').checked = currentSettings.zeroNil;
 }
 
+// Dims both the Tier 2 sub-settings panel and the per-position severe
+// threshold column together -- they're only meaningful when Tier 2 is on.
+function setTier2Enabled(enabled) {
+  document.getElementById('tier2-subsettings').classList.toggle('disabled', !enabled);
+  document.querySelectorAll('.severe-threshold-cell').forEach((cell) => {
+    cell.classList.toggle('disabled', !enabled);
+  });
+}
+
 document.getElementById('enable-tier2-checkbox').addEventListener('change', (e) => {
-  document.getElementById('tier2-subsettings').classList.toggle('disabled', !e.target.checked);
+  setTier2Enabled(e.target.checked);
 });
 
 document.getElementById('save-settings-btn').addEventListener('click', async () => {
   const thresholdOverrides = {};
-  document.querySelectorAll('#threshold-table-body input').forEach((input) => {
+  const severeThresholdOverrides = {};
+  document.querySelectorAll('#threshold-groups input').forEach((input) => {
     const pos = input.dataset.pos;
     const field = input.dataset.field;
     const value = Number(input.value);
+    if (field === 'severe') {
+      // Only store it as an override if it actually differs from default,
+      // keeps the settings file clean and makes "changed from default"
+      // easy to eyeball later.
+      if (value !== defaultSevereThresholds[pos]) severeThresholdOverrides[pos] = value;
+      return;
+    }
     const base = defaultChecks[pos];
     if (!thresholdOverrides[pos]) thresholdOverrides[pos] = {};
-    // Only store it as an override if it actually differs from default,
-    // keeps the settings file clean and makes "changed from default"
-    // easy to eyeball later.
     if (value !== base[field]) thresholdOverrides[pos][field] = value;
   });
   // Drop empty override entries
@@ -315,8 +377,7 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
   currentSettings = {
     thresholdOverrides,
     enableTier2: document.getElementById('enable-tier2-checkbox').checked,
-    severeThreshold: Number(document.getElementById('severe-threshold-input').value),
-    smallPositionSevereThreshold: Number(document.getElementById('small-position-severe-threshold-input').value),
+    severeThresholdOverrides,
     prestigeGapCap: Number(document.getElementById('prestige-cap-input').value),
     zeroNil: document.getElementById('zero-nil-checkbox').checked,
   };
@@ -329,12 +390,51 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
 
 document.getElementById('reset-settings-btn').addEventListener('click', async () => {
   if (!confirm('Reset all settings to defaults?')) return;
-  currentSettings = { thresholdOverrides: {}, enableTier2: true, severeThreshold: 2, smallPositionSevereThreshold: 0, prestigeGapCap: 3, zeroNil: true };
+  currentSettings = { thresholdOverrides: {}, enableTier2: true, severeThresholdOverrides: {}, prestigeGapCap: 3, zeroNil: true };
   await window.api.saveSettings(currentSettings);
   await loadSettingsUI();
 });
 
 // ===== History tab =====
+const OVR_BUCKETS = [
+  { key: 'under60', label: 'Below 60', cssClass: 'ovr-under60' },
+  { key: 'r60to70', label: '60 – 70', cssClass: 'ovr-60to70' },
+  { key: 'r70to80', label: '70 – 80', cssClass: 'ovr-70to80' },
+  { key: 'r80plus', label: '80+', cssClass: 'ovr-80plus' },
+];
+
+function buildBreakdownBars(rows) {
+  const max = Math.max(...rows.map((r) => r.count), 1);
+  return rows.map((r) => `
+    <div class="breakdown-bar-row">
+      <span class="breakdown-label">${r.label}</span>
+      <div class="breakdown-bar-track"><div class="breakdown-bar-fill ${r.cssClass || ''}" style="width:${Math.max(2, (r.count / max) * 100)}%"></div></div>
+      <span class="breakdown-count">${r.count}</span>
+    </div>
+  `).join('');
+}
+
+function buildBreakdownPanel(entry) {
+  const byCheckRows = Object.entries(entry.byCheck || {})
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, count]) => ({ label: displayPositionName(key), count }));
+
+  const positionCol = byCheckRows.length
+    ? `<div class="breakdown-col"><h4>Moves by Position</h4>${buildBreakdownBars(byCheckRows)}</div>`
+    : `<div class="breakdown-col"><h4>Moves by Position</h4><p class="section-hint">No moves recorded for this run.</p></div>`;
+
+  let ratingCol;
+  if (entry.ovrBuckets) {
+    const rows = OVR_BUCKETS.map((b) => ({ label: b.label, count: entry.ovrBuckets[b.key] || 0, cssClass: b.cssClass }));
+    ratingCol = `<div class="breakdown-col"><h4>Moves by Rating Range</h4>${buildBreakdownBars(rows)}</div>`;
+  } else {
+    ratingCol = `<div class="breakdown-col"><h4>Moves by Rating Range</h4><p class="section-hint">Not available for runs recorded before this update.</p></div>`;
+  }
+
+  return `<div class="history-breakdown-panel">${positionCol}${ratingCol}</div>`;
+}
+
 async function renderHistory() {
   const history = await window.api.getHistory();
   const chart = document.getElementById('history-chart');
@@ -367,8 +467,15 @@ async function renderHistory() {
       <td>${entry.tier2Count}</td>
       <td>${entry.affectedTeamCount}</td>
       <td></td>
+      <td></td>
     `;
-    const deleteCell = row.lastElementChild;
+    const [, , , , , detailsCell, deleteCell] = row.children;
+
+    const detailsBtn = document.createElement('button');
+    detailsBtn.className = 'details-toggle-btn';
+    detailsBtn.textContent = 'Details';
+    detailsCell.appendChild(detailsBtn);
+
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete-entry-btn';
     deleteBtn.textContent = 'Delete';
@@ -379,6 +486,20 @@ async function renderHistory() {
     });
     deleteCell.appendChild(deleteBtn);
     tbody.appendChild(row);
+
+    const detailRow = document.createElement('tr');
+    detailRow.className = 'history-breakdown-row';
+    detailRow.hidden = true;
+    const detailCell = document.createElement('td');
+    detailCell.colSpan = 7;
+    detailCell.innerHTML = buildBreakdownPanel(entry);
+    detailRow.appendChild(detailCell);
+    tbody.appendChild(detailRow);
+
+    detailsBtn.addEventListener('click', () => {
+      detailRow.hidden = !detailRow.hidden;
+      detailsBtn.textContent = detailRow.hidden ? 'Details' : 'Hide';
+    });
   }
 }
 

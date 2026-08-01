@@ -31,6 +31,11 @@
         <button id="select-save-btn" class="btn btn-secondary">Choose Save File</button>
         <div class="save-path" id="save-path">No save selected</div>
       </section>
+      <div class="preseason-warning" id="preseason-warning" hidden>
+        Don't run Transfer Wave until your dynasty is actually in the preseason. Roster moves made mid-season can
+        disrupt games already scheduled or in progress. Come back once you've advanced to the preseason, choose your
+        save again, and confirm you're there.
+      </div>
 
       <section class="actions">
         <button id="preview-btn" class="btn btn-primary" disabled>Preview (Dry Run)</button>
@@ -70,10 +75,34 @@
       <div class="settings-scroll">
         <h2 class="section-title">Position Thresholds</h2>
         <p class="section-hint">Min/max per position. Leave at default unless you have a specific reason to change it -- these were calibrated against real league-wide data.</p>
-        <table class="threshold-table" id="threshold-table">
-          <thead><tr><th>Position</th><th>Min</th><th>Max</th><th>Default</th></tr></thead>
-          <tbody id="threshold-table-body"></tbody>
-        </table>
+        <p class="section-hint">
+          <strong>Severe Donor Threshold</strong> controls Tier 2 for that position specifically -- how far over max a
+          team has to be before it's treated as a forced-release situation (see Tier 2 Behavior below). Every position
+          has its own value now, so you can dial each one in for your own dynasty instead of one general rule.
+        </p>
+        <div id="threshold-groups">
+          <details class="threshold-group" open>
+            <summary>Offense</summary>
+            <table class="threshold-table">
+              <thead><tr><th>Position</th><th>Min</th><th>Max</th><th>Severe Donor Threshold</th><th>Default</th></tr></thead>
+              <tbody id="threshold-table-body-offense"></tbody>
+            </table>
+          </details>
+          <details class="threshold-group" open>
+            <summary>Defense</summary>
+            <table class="threshold-table">
+              <thead><tr><th>Position</th><th>Min</th><th>Max</th><th>Severe Donor Threshold</th><th>Default</th></tr></thead>
+              <tbody id="threshold-table-body-defense"></tbody>
+            </table>
+          </details>
+          <details class="threshold-group" open>
+            <summary>Special Teams</summary>
+            <table class="threshold-table">
+              <thead><tr><th>Position</th><th>Min</th><th>Max</th><th>Severe Donor Threshold</th><th>Default</th></tr></thead>
+              <tbody id="threshold-table-body-special"></tbody>
+            </table>
+          </details>
+        </div>
 
         <h2 class="section-title">Tier 2 Behavior</h2>
         <p class="section-hint">
@@ -93,24 +122,13 @@
           toward balance over time, turn it off if you'd rather the tool never touch a team beyond what's strictly required.
         </p>
         <div id="tier2-subsettings">
-          <div class="settings-row">
-            <label for="severe-threshold-input">Severe donor threshold (over max by more than):</label>
-            <input type="number" id="severe-threshold-input" min="0" step="1" />
-          </div>
           <p class="section-hint">
-            A team only qualifies for Tier 2 once it's over its max by <em>more</em> than this number. Example: with a
-            threshold of 2 and a WR max of 10, a team sitting at 12 WRs is fine (Tier 1 territory), but a team sitting at 14
-            is now "severe" — Tier 2 forces some of that excess out even if no other team currently needs a WR.
-          </p>
-          <div class="settings-row">
-            <label for="small-position-severe-threshold-input">Severe donor threshold for FB / K / P specifically:</label>
-            <input type="number" id="small-position-severe-threshold-input" min="0" step="1" />
-          </div>
-          <p class="section-hint">
-            FB/K/P have such tiny natural ranges (1-2 total) that the general threshold above almost never triggers for
-            them — a team would need 4+ punters before Tier 2 even noticed. This separate, smaller threshold exists so a
-            team hoarding just 1 extra fullback/kicker/punter beyond its max can still get forced to release it, rescuing
-            a team stuck at 0.
+            Each position's own severe donor threshold is set in the Position Thresholds table above -- a team only
+            qualifies for Tier 2 at that position once it's over its max by <em>more</em> than its threshold. Example:
+            with a threshold of 2 and a WR max of 10, a team sitting at 12 WRs is fine (Tier 1 territory), but a team
+            sitting at 14 is now "severe" — Tier 2 forces some of that excess out even if no other team currently needs
+            a WR. FB/K/P default to 0 instead of 2 since their natural ranges are so small that the general default
+            would almost never trigger for them, but every position (including those three) can be tuned individually.
           </p>
           <div class="settings-row">
             <label for="prestige-cap-input">Prestige gap cap for Tier 2 moves:</label>
@@ -175,7 +193,7 @@
         <p class="section-hint">Every time you click Apply, a record is saved here -- a good way to see whether the league is trending toward balance over time.</p>
         <div id="history-chart" class="history-chart"></div>
         <table class="history-table" id="history-table">
-          <thead><tr><th>Date</th><th>Total</th><th>Tier 1</th><th>Tier 2</th><th>Teams Affected</th><th></th></tr></thead>
+          <thead><tr><th>Date</th><th>Total</th><th>Tier 1</th><th>Tier 2</th><th>Teams Affected</th><th></th><th></th></tr></thead>
           <tbody id="history-table-body"></tbody>
         </table>
         <p id="history-empty" class="section-hint" hidden>No runs recorded yet -- click Apply on the Run tab to start tracking history.</p>
@@ -242,6 +260,20 @@
         </div>
       </div>
     </section>
+  </div>
+
+  <div class="modal-overlay" id="preseason-modal-overlay" hidden>
+    <div class="modal-box">
+      <h3>Is this dynasty in the preseason?</h3>
+      <p>
+        Transfer Wave is meant to run once, before each new season starts. Running it mid-season can move players
+        around teams that already have games scheduled or in progress this year.
+      </p>
+      <div class="modal-actions">
+        <button id="preseason-yes-btn" class="btn btn-primary">Yes, I am in the Preseason</button>
+        <button id="preseason-no-btn" class="btn btn-secondary">No</button>
+      </div>
+    </div>
   </div>
 
   <script src="renderer.js"></script>

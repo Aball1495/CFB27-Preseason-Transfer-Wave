@@ -4,7 +4,7 @@ A tool that fixes CPU team rosters in EA Sports College Football 27 dynasties.
 
 The CPU doesn't manage its own rosters well. Some teams end up with way too many players at one position (14 running backs) while other teams end up with almost none (0 punters). This tool looks at every CPU team's roster, finds those problems, and moves players around to fix them — before each new season starts.
 
-It never touches your own team. It never changes your original save file — every run makes a brand new file, so your original is always safe.
+It never touches your own team. It never changes your original save file — every run makes a brand new file, so your original is always safe. **Run this every preseason, first thing.**
 
 ## Screenshots
 
@@ -39,7 +39,7 @@ It never touches your own team. It never changes your original save file — eve
 - [Scheme awareness](#scheme-awareness)
 - [Safety design](#safety-design)
 - [Known limitations](#known-limitations)
-- [Credits](#credits)
+- [Changelog](#changelog)
 
 ---
 
@@ -57,7 +57,7 @@ Step by step, each time you run it:
 6. If a team is *way* over the range (not just a little), some of that extra gets moved out even if no other team currently needs it. This is capped so a bad team doesn't just get handed players from a great team — with one exception: a real talent upgrade is still allowed through.
 7. It saves everything correctly — not just "who's on what team," but also depth charts, left/right O-line balance, and NIL values.
 
-You're meant to run this once before every season, for as long as your dynasty lasts.
+You're meant to run this every preseason, first thing I always do when I get there. Stop, save, exit dynasty, and run the tool.
 
 ## Installation
 
@@ -72,7 +72,7 @@ Download the release, unzip it wherever you like, and double-click `Preseason Tr
 
 ## The Run tab
 
-- **Choose Save File** — pick your save.
+- **Choose Save File** — pick your save. A prompt asks whether this dynasty is in the preseason first; answering "No" locks Preview/Apply until you pick a save and confirm again.
 - **Preview (Dry Run)** — shows what would happen. Changes nothing.
 - **Apply Changes** — actually makes the moves and saves a new file. Asks you to confirm first.
 - **Live Log** — shows each move as it happens. `[T1]` means a normal move (filling real need). `[T2]` means a forced move (a team had way too many players at that spot).
@@ -80,10 +80,9 @@ Download the release, unzip it wherever you like, and double-click `Preseason Tr
 
 ## The Settings tab
 
-- **Position Thresholds** — the normal min/max range for every position. You can change any of them. The defaults were set by looking at real numbers across a whole league, not guessed.
+- **Position Thresholds** — the normal min/max range for every position, plus that position's own Severe Donor Threshold (see Tier 2 Behavior below). You can change any of them. The defaults were set by looking at real numbers across a whole league, not guessed. Grouped into three collapsible sections — Offense, Defense, Special Teams — so the list doesn't run on forever if you're not touching most of it.
 - **Tier 2 Behavior** — a switch to turn the "forced move" behavior on or off, plus:
-  - **Severe donor threshold** — how far over the max a team has to be before it counts as a "forced move" situation.
-  - **Severe donor threshold for FB/K/P** — these positions have such small normal ranges that the setting above barely ever applies to them. This is a separate, smaller number just for those three, so a team stuck with zero punters can actually get one.
+  - **Severe donor threshold** — how far over the max a team has to be before it counts as a "forced move" situation. Set per position/group up in the Position Thresholds table above, not as one general rule — tune each one for your own dynasty. FB/K/P default to 0 instead of 2 since their tiny natural ranges mean the general default would almost never trigger for them, but every position (including those three) can be adjusted individually.
   - **Prestige gap cap** — stops a bad team's leftover player from jumping straight to a great team, unless that player is actually good enough to be one of the best at that position on the new team.
 - **Other Options** — a checkbox to zero out a moved player's NIL value. We don't actually know if this changes anything about how the CPU treats the player — it's just a reasonable guess, so it's optional instead of forced on.
 - **Playbook Awareness** — explains how a team's real offense/defense playbook shifts some of the numbers automatically. You don't set this yourself; it just happens based on real data.
@@ -93,6 +92,8 @@ Settings are saved and used every time you run the tool.
 ## The History tab
 
 Every time you click **Apply**, it saves a record here — date, total moves, how many were T1 vs T2, how many teams were touched. Shown as a chart and a table. You can delete any single entry or clear everything.
+
+Each entry also has a **Details** toggle that expands two mini breakdowns for that run: how many players moved at each position, and how many fell into each overall-rating range (below 60, 60–70, 70–80, 80+). The rating-range breakdown only exists for runs made after this feature shipped — older entries show a note instead of guessing.
 
 ## The Team Health tab
 
@@ -162,7 +163,15 @@ A team's real offense/defense shifts some max numbers automatically:
 - **Your own team's numbers can occasionally be wrong** because of something in the game's own data, unrelated to this tool (confirmed once on a real save: some of a user's real players were tagged as belonging to a completely different team internally). Because of this, your team is left out of the Season History totals, and a warning shows up if you scan your own team on the Current Snapshot tab.
 - **Needs a specific version of the `madden-franchise` library** (loaded a slightly unusual way) because the version needed for CFB 27's current patch wasn't available the normal way at the time this was built.
 
-## Credits
+## Changelog
 
-- Built on [`madden-franchise`](https://github.com/bep713/madden-franchise) by bep713.
-- The way Roster/DepthChart data gets fixed after a move (treat TeamIndex as the source of truth, then rebuild everything else from that) is based on the approach used in PocketScout Utilities.
+### v1.0.1
+
+- **Per-position Severe Donor Threshold** — replaces the old two-scalar setting (one general number, one FB/K/P-specific number). Every position/group in the Position Thresholds table now has its own tunable Severe Donor Threshold, so you can dial in Tier 2 behavior individually instead of by a hardcoded FB/K/P special case.
+- **Collapsible Position Thresholds groups** — the table is now split into three collapsible sections (Offense, Defense, Special Teams) so Settings doesn't run on forever if you're not touching most of it.
+- **Preseason confirmation prompt** — choosing a save file on the Run tab now asks whether the dynasty is actually in the preseason. Answering "No" locks Preview/Apply until you pick a save and confirm again.
+- **History tab breakdowns** — each run now has a **Details** toggle showing moves by position and moves by overall-rating range (below 60, 60–70, 70–80, 80+). The rating-range breakdown only applies to runs made after this update; older entries note that it isn't available.
+
+### v1.0.0
+
+- Initial public release.

@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { run, scanTeamHealth, POSITION_KEYS, DEFAULT_CHECKS } = require('./lib/redistribution');
+const { run, scanTeamHealth, POSITION_KEYS, DEFAULT_CHECKS, DEFAULT_SEVERE_THRESHOLDS } = require('./lib/redistribution');
 const { TEAM_COLORS } = require('./team_colors.cjs');
 
 // Short-name aliases for the ~21 teams whose real in-game DisplayName
@@ -55,11 +55,37 @@ function defaultSettings() {
   return {
     thresholdOverrides: {},
     enableTier2: true,
-    severeThreshold: 2,
-    smallPositionSevereThreshold: 0,
+    severeThresholdOverrides: {},
     prestigeGapCap: 3,
     zeroNil: true,
   };
+}
+
+// v1.0.0 stored severe-donor-threshold as two global scalars
+// (severeThreshold + smallPositionSevereThreshold, applied via a
+// hardcoded FB/K/P special case). Settings are now per-position, so a
+// saved settings.json from before this change needs a one-time migration
+// into severeThresholdOverrides -- otherwise a user's tuned values would
+// silently reset to the defaults on next launch.
+function migrateSettings(settings) {
+  if (!settings || settings.severeThresholdOverrides) return settings;
+  const hadOldFields = 'severeThreshold' in settings || 'smallPositionSevereThreshold' in settings;
+  if (!hadOldFields) {
+    settings.severeThresholdOverrides = {};
+    return settings;
+  }
+  const generalValue = settings.severeThreshold ?? 2;
+  const smallValue = settings.smallPositionSevereThreshold ?? 0;
+  const overrides = {};
+  for (const key of Object.keys(DEFAULT_SEVERE_THRESHOLDS)) {
+    const wasSmallPosition = ['FB', 'K', 'P'].includes(key);
+    const oldEffectiveValue = wasSmallPosition ? smallValue : generalValue;
+    if (oldEffectiveValue !== DEFAULT_SEVERE_THRESHOLDS[key]) overrides[key] = oldEffectiveValue;
+  }
+  settings.severeThresholdOverrides = overrides;
+  delete settings.severeThreshold;
+  delete settings.smallPositionSevereThreshold;
+  return settings;
 }
 
 function createWindow() {
@@ -95,7 +121,7 @@ ipcMain.handle('select-save-file', async () => {
   return result.filePaths[0];
 });
 
-ipcMain.handle('get-settings', () => loadJson(SETTINGS_PATH, defaultSettings()));
+ipcMain.handle('get-settings', () => migrateSettings(loadJson(SETTINGS_PATH, defaultSettings())));
 
 ipcMain.handle('save-settings', (_event, settings) => {
   saveJson(SETTINGS_PATH, settings);
@@ -104,6 +130,7 @@ ipcMain.handle('save-settings', (_event, settings) => {
 
 ipcMain.handle('get-default-checks', () => DEFAULT_CHECKS);
 ipcMain.handle('get-position-keys', () => POSITION_KEYS);
+ipcMain.handle('get-default-severe-thresholds', () => DEFAULT_SEVERE_THRESHOLDS);
 
 ipcMain.handle('get-team-visuals', () => {
   // Logo filenames already use the real in-game short names (e.g.
@@ -200,11 +227,18 @@ ipcMain.on('start-run', async (event, { savePath, dryRun }) => {
     if (!sender.isDestroyed()) sender.send('log-line', line);
   };
   try {
-    const settings = loadJson(SETTINGS_PATH, defaultSettings());
+    const settings = migrateSettings(loadJson(SETTINGS_PATH, defaultSettings()));
     const summary = await run({ savePath, dryRun, log, settings });
 
     if (!dryRun) {
       const history = loadJson(HISTORY_PATH, []);
+      const ovrBuckets = { under60: 0, r60to70: 0, r70to80: 0, r80plus: 0 };
+      for (const move of summary.moves) {
+        if (move.ovr < 60) ovrBuckets.under60++;
+        else if (move.ovr < 70) ovrBuckets.r60to70++;
+        else if (move.ovr < 80) ovrBuckets.r70to80++;
+        else ovrBuckets.r80plus++;
+      }
       history.push({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         date: new Date().toISOString(),
@@ -215,6 +249,7 @@ ipcMain.on('start-run', async (event, { savePath, dryRun }) => {
         topTwoExceptionCount: summary.topTwoExceptionCount,
         affectedTeamCount: summary.affectedTeamCount,
         byCheck: summary.byCheck,
+        ovrBuckets,
         outputPath: summary.outputPath,
       });
       saveJson(HISTORY_PATH, history);
