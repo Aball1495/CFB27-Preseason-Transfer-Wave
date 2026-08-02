@@ -140,9 +140,32 @@
             <em>donating</em> team. A player who'd immediately rank in the top 2 at their position on the new team skips
             this cap entirely (a real, portal-worthy talent upgrade is allowed to jump further than an ordinary depth move).
           </p>
+          <div class="settings-row">
+            <label for="tier2-recipient-cap-input">Max Tier 2 players any one team can absorb per position, per run:</label>
+            <input type="number" id="tier2-recipient-cap-input" min="1" step="1" />
+          </div>
+          <p class="section-hint">
+            Without this, a rare low-prestige team can end up as the ONLY eligible recipient for a whole backlog of
+            forced-dump players at once, absorbing dozens in a single Apply (confirmed on a real save). Once a team
+            hits this cap at a given position, any further leftover-severe candidates that would have gone there are
+            simply left unassigned for this run instead -- a big backlog spreads across several preseasons rather
+            than landing all at once. Default is intentionally conservative (1); raise it if you'd rather clear a
+            backlog faster at the cost of some concentration.
+          </p>
         </div>
 
         <h2 class="section-title">Other Options</h2>
+        <div class="settings-row">
+          <label for="drift-threshold-input">Drift warning threshold (non-FB shortages):</label>
+          <input type="number" id="drift-threshold-input" min="0" step="1" />
+        </div>
+        <p class="section-hint">
+          When you choose a save on the Run tab, the drift check counts how many positions are showing a real
+          shortage across CPU teams -- FB is excluded from this count on purpose (see the threshold table note; it
+          can't fully be fixed and will show shortage in a healthy league too). Once that count reaches this number,
+          the check actively recommends running the tool. Below it, the check still shows what it found, just without
+          the recommendation. Surplus never counts toward this at all -- a surplus is routine and self-corrects.
+        </p>
         <div class="settings-row checkbox-row">
           <input type="checkbox" id="zero-nil-checkbox" />
           <label for="zero-nil-checkbox">Zero out NIL value/compensation on moved players</label>
@@ -164,9 +187,11 @@
         </p>
         <ul class="scheme-example-list">
           <li><strong>Air Raid / Run and Shoot / Veer and Shoot / Spread</strong> (pass-heavy): WR max +1, TE max &minus;1,
-            FB min drops to 0 -- these teams realistically play with more receivers, fewer tight ends, and often no true fullback at all.</li>
-          <li><strong>Power Spread / Spread Option / Pistol / Option</strong> (run-heavy): HB max +1, WR max &minus;1 --
-            more backs to rotate, fewer receivers needed.</li>
+            FB min drops to 0 and max drops by 1 -- these teams realistically play with more receivers, fewer tight ends,
+            and often no true fullback at all.</li>
+          <li><strong>Power Spread / Spread Option / Pistol / Option</strong> (run-heavy): HB max +1, WR max &minus;1,
+            FB max +1 and min guaranteed at least 1 -- more backs to rotate, fewer receivers needed, and these schemes
+            actually use a real fullback, so one is always expected rather than optional.</li>
           <li><strong>Base 3-4 / 3-4 Multiple / 3-3-5 / 3-3-5 Tite / 3-2-6</strong> (3-down fronts): DT max &minus;1,
             LOLB/MLB/ROLB max +1 each -- a 3-4 needs one true nose instead of two full tackles, but a real 4th linebacker.</li>
           <li><strong>3-3-5 / 3-3-5 Tite / 3-2-6</strong> specifically (extra-DB packages): CB/FS/SS max +1 each -- these
@@ -209,6 +234,7 @@
         <nav class="subtabs">
           <button class="subtab-btn active" data-subtab="snapshot">Current Snapshot</button>
           <button class="subtab-btn" data-subtab="season-history">Season History</button>
+          <button class="subtab-btn" data-subtab="roster">Roster</button>
         </nav>
 
         <!-- SNAPSHOT SUBTAB -->
@@ -258,20 +284,57 @@
           </table>
           <p id="season-health-empty" class="section-hint" hidden>No scans recorded yet -- run a scan on the Current Snapshot tab first.</p>
         </div>
+
+        <!-- ROSTER SUBTAB -->
+        <div class="subtab-panel" id="subtab-roster">
+          <p class="section-hint">
+            Full current roster for one team, plus who arrived/departed in the most recent Apply run -- a way to
+            actually eyeball what changed instead of trusting the Live Log alone.
+          </p>
+          <div class="settings-row">
+            <button id="roster-select-save-btn" class="btn btn-secondary">Choose Save File</button>
+            <div class="save-path" id="roster-save-path">No save selected</div>
+          </div>
+          <div class="settings-row">
+            <select id="roster-team-select" disabled><option>Choose a save first...</option></select>
+          </div>
+          <p id="roster-history-note" class="section-hint" hidden></p>
+          <div id="roster-header" class="team-health-header" hidden>
+            <img id="roster-logo" class="team-logo-img" alt="" />
+            <div>
+              <div id="roster-name" class="team-health-name"></div>
+              <div id="roster-schemes" class="team-health-schemes"></div>
+            </div>
+          </div>
+          <table class="history-table" id="roster-table">
+            <thead><tr><th>Name</th><th>Pos</th><th>OVR</th><th>Class</th><th></th></tr></thead>
+            <tbody id="roster-table-body"></tbody>
+          </table>
+          <div id="roster-departed-section" hidden>
+            <h2 class="section-title" style="margin-top:20px;">Recently Departed</h2>
+            <p class="section-hint">Left this team in the most recent Apply run.</p>
+            <table class="history-table" id="roster-departed-table">
+              <thead><tr><th>Name</th><th>Pos</th><th>OVR</th><th>Went to</th></tr></thead>
+              <tbody id="roster-departed-table-body"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </section>
   </div>
 
   <div class="modal-overlay" id="preseason-modal-overlay" hidden>
-    <div class="modal-box">
+    <div class="modal-box modal-box-wide">
       <h3>Is this dynasty in the preseason?</h3>
+      <p id="drift-check-status" class="drift-status">Scanning your league for roster drift…</p>
+      <div id="drift-check-results" class="drift-results" hidden></div>
       <p>
         Transfer Wave is meant to run once, before each new season starts. Running it mid-season can move players
         around teams that already have games scheduled or in progress this year.
       </p>
       <div class="modal-actions">
-        <button id="preseason-yes-btn" class="btn btn-primary">Yes, I am in the Preseason</button>
-        <button id="preseason-no-btn" class="btn btn-secondary">No</button>
+        <button id="preseason-yes-btn" class="btn btn-primary" disabled>Yes, I am in the Preseason</button>
+        <button id="preseason-no-btn" class="btn btn-secondary" disabled>No</button>
       </div>
     </div>
   </div>

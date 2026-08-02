@@ -438,6 +438,128 @@ body {
   justify-content: flex-end;
 }
 
+.modal-box-wide {
+  max-width: 560px;
+}
+
+.drift-status {
+  font-size: 13px;
+  color: #a3a7b5;
+  margin: 0 0 14px;
+}
+
+.drift-results {
+  margin-bottom: 14px;
+}
+
+.drift-summary {
+  font-size: 13px;
+  color: #a3a7b5;
+  margin: 0 0 10px;
+}
+
+.drift-clean {
+  font-size: 13px;
+  color: #86efac;
+  margin: 0;
+  padding: 10px 12px;
+  background: rgba(74, 222, 128, 0.08);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+  border-radius: 8px;
+}
+
+.drift-recommend {
+  font-size: 13px;
+  color: #fca5a5;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.drift-mild {
+  font-size: 13px;
+  color: #a3a7b5;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+}
+
+.drift-list li.drift-team-entry {
+  display: block;
+  padding: 8px 10px;
+}
+
+.drift-team-entry > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.drift-team-reasons {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0 0 0 16px;
+}
+
+.drift-team-reasons li {
+  font-size: 12px;
+  color: #a3a7b5;
+  padding: 2px 0;
+  border-bottom: none;
+}
+
+.drift-error {
+  font-size: 13px;
+  color: #fca5a5;
+  margin: 0;
+}
+
+.drift-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #2a2d38;
+  border-radius: 8px;
+}
+
+.drift-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  color: #c7cad4;
+  border-bottom: 1px solid #22252f;
+}
+
+.drift-list li:last-child {
+  border-bottom: none;
+}
+
+.drift-list li.drift-more {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.drift-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.drift-dot.shortage { background: #f87171; }
+.drift-dot.surplus { background: #fbbf24; }
+
 .history-breakdown-row td {
   padding: 0;
   border-bottom: 1px solid #1f2330;
@@ -508,6 +630,18 @@ body {
 
 .details-toggle-btn:hover {
   background: #1f2330;
+}
+
+.roster-badge-new {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.35);
 }
 
 .settings-row {

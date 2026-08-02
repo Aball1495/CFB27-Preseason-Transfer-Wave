@@ -8,6 +8,7 @@ subtabButtons.forEach((btn) => {
     btn.classList.add('active');
     document.getElementById(`subtab-${btn.dataset.subtab}`).classList.add('active');
     if (btn.dataset.subtab === 'season-history') renderSeasonHealthHistory();
+    if (btn.dataset.subtab === 'roster') initRosterTabOnce();
   });
 });
 
@@ -204,13 +205,106 @@ const preseasonWarning = document.getElementById('preseason-warning');
 const preseasonModalOverlay = document.getElementById('preseason-modal-overlay');
 const preseasonYesBtn = document.getElementById('preseason-yes-btn');
 const preseasonNoBtn = document.getElementById('preseason-no-btn');
+const driftStatusEl = document.getElementById('drift-check-status');
+const driftResultsEl = document.getElementById('drift-check-results');
 let pendingSavePath = null;
+
+const DRIFT_DISPLAY_CAP = 20;
+
+function buildDriftResultsEl(teamCount, deficientTeams, nonFbShortageCount, driftWarningThreshold, recommendRunning) {
+  const wrapper = document.createElement('div');
+
+  if (recommendRunning) {
+    const rec = document.createElement('p');
+    rec.className = 'drift-recommend';
+    rec.textContent =
+      `${nonFbShortageCount} positions (not counting FB) are showing a real shortage across CPU teams -- ` +
+      `enough that running Transfer Wave this preseason is worth doing.`;
+    wrapper.appendChild(rec);
+  } else if (!deficientTeams.length) {
+    const clean = document.createElement('p');
+    clean.className = 'drift-clean';
+    clean.textContent = `No major roster drift detected across ${teamCount} CPU teams -- you probably don't need to run Transfer Wave yet.`;
+    wrapper.appendChild(clean);
+    return wrapper;
+  } else {
+    const mild = document.createElement('p');
+    mild.className = 'drift-mild';
+    mild.textContent =
+      `Some drift showed up, but not enough to actively recommend running the tool ` +
+      `(${nonFbShortageCount} non-FB shortage${nonFbShortageCount === 1 ? '' : 's'}, threshold is ${driftWarningThreshold}). ` +
+      `Details below if you want to look anyway.`;
+    wrapper.appendChild(mild);
+  }
+
+  const summary = document.createElement('p');
+  summary.className = 'drift-summary';
+  summary.textContent = `${deficientTeams.length} team${deficientTeams.length === 1 ? '' : 's'} showing a real shortage, worst first:`;
+  wrapper.appendChild(summary);
+
+  const list = document.createElement('ul');
+  list.className = 'drift-list';
+  for (const entry of deficientTeams.slice(0, DRIFT_DISPLAY_CAP)) {
+    const li = document.createElement('li');
+    li.className = 'drift-team-entry';
+    const teamLine = document.createElement('div');
+    const dot = document.createElement('span');
+    dot.className = 'drift-dot shortage';
+    teamLine.appendChild(dot);
+    const strong = document.createElement('strong');
+    strong.textContent = entry.team;
+    teamLine.appendChild(strong);
+    li.appendChild(teamLine);
+
+    const reasons = document.createElement('ul');
+    reasons.className = 'drift-team-reasons';
+    for (const s of entry.shortages) {
+      const reasonLi = document.createElement('li');
+      reasonLi.textContent = `${s.count} ${displayPositionName(s.position)} (normal min ${s.min})`;
+      reasons.appendChild(reasonLi);
+    }
+    li.appendChild(reasons);
+    list.appendChild(li);
+  }
+  if (deficientTeams.length > DRIFT_DISPLAY_CAP) {
+    const more = document.createElement('li');
+    more.className = 'drift-more';
+    more.textContent = `+${deficientTeams.length - DRIFT_DISPLAY_CAP} more team(s) not shown`;
+    list.appendChild(more);
+  }
+  wrapper.appendChild(list);
+  return wrapper;
+}
+
+async function runDriftCheckAndShowModal(filePath) {
+  preseasonModalOverlay.hidden = false;
+  preseasonYesBtn.disabled = true;
+  preseasonNoBtn.disabled = true;
+  driftStatusEl.hidden = false;
+  driftStatusEl.textContent = 'Scanning your league for roster drift…';
+  driftResultsEl.hidden = true;
+  driftResultsEl.innerHTML = '';
+
+  try {
+    const { teamCount, deficientTeams, nonFbShortageCount, driftWarningThreshold, recommendRunning } = await window.api.checkDrift(filePath);
+    driftResultsEl.appendChild(buildDriftResultsEl(teamCount, deficientTeams, nonFbShortageCount, driftWarningThreshold, recommendRunning));
+  } catch (err) {
+    const errorEl = document.createElement('p');
+    errorEl.className = 'drift-error';
+    errorEl.textContent = `Couldn't scan this save for drift (${err.message || err}). You can still continue.`;
+    driftResultsEl.appendChild(errorEl);
+  }
+  driftStatusEl.hidden = true;
+  driftResultsEl.hidden = false;
+  preseasonYesBtn.disabled = false;
+  preseasonNoBtn.disabled = false;
+}
 
 selectSaveBtn.addEventListener('click', async () => {
   const filePath = await window.api.selectSaveFile();
   if (!filePath) return;
   pendingSavePath = filePath;
-  preseasonModalOverlay.hidden = false;
+  runDriftCheckAndShowModal(filePath);
 });
 
 preseasonYesBtn.addEventListener('click', () => {
@@ -253,8 +347,8 @@ previewBtn.addEventListener('click', () => startRun(true));
 
 applyBtn.addEventListener('click', () => {
   const confirmed = confirm(
-    'This will compute and write a NEW save file with "_REDISTRIBUTED" appended to the name.\n\n' +
-    'Your original save is never modified. Continue?'
+    'This will overwrite your save file in place.\n\n' +
+    'A backup of the original is made first, saved to a "Preseason Transfer Backup" folder next to your save. Continue?'
   );
   if (confirmed) startRun(false);
 });
@@ -335,6 +429,8 @@ async function loadSettingsUI() {
   document.getElementById('enable-tier2-checkbox').checked = currentSettings.enableTier2;
   setTier2Enabled(currentSettings.enableTier2);
   document.getElementById('prestige-cap-input').value = currentSettings.prestigeGapCap;
+  document.getElementById('tier2-recipient-cap-input').value = currentSettings.tier2RecipientCapPerPosition ?? 1;
+  document.getElementById('drift-threshold-input').value = currentSettings.driftWarningThreshold ?? 10;
   document.getElementById('zero-nil-checkbox').checked = currentSettings.zeroNil;
 }
 
@@ -379,6 +475,8 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
     enableTier2: document.getElementById('enable-tier2-checkbox').checked,
     severeThresholdOverrides,
     prestigeGapCap: Number(document.getElementById('prestige-cap-input').value),
+    tier2RecipientCapPerPosition: Number(document.getElementById('tier2-recipient-cap-input').value),
+    driftWarningThreshold: Number(document.getElementById('drift-threshold-input').value),
     zeroNil: document.getElementById('zero-nil-checkbox').checked,
   };
   await window.api.saveSettings(currentSettings);
@@ -390,7 +488,7 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
 
 document.getElementById('reset-settings-btn').addEventListener('click', async () => {
   if (!confirm('Reset all settings to defaults?')) return;
-  currentSettings = { thresholdOverrides: {}, enableTier2: true, severeThresholdOverrides: {}, prestigeGapCap: 3, zeroNil: true };
+  currentSettings = { thresholdOverrides: {}, enableTier2: true, severeThresholdOverrides: {}, prestigeGapCap: 3, tier2RecipientCapPerPosition: 1, driftWarningThreshold: 10, zeroNil: true };
   await window.api.saveSettings(currentSettings);
   await loadSettingsUI();
 });
@@ -591,6 +689,147 @@ function renderTeamHealth(team) {
       <div class="health-range">${data.min} - ${data.max}</div>
     `;
     grid.appendChild(card);
+  }
+}
+
+// Same-game position labels for the Roster tab specifically -- distinct
+// from displayPositionName's grouped labels used in Settings/History,
+// since this tab shows individual players with their exact position,
+// not a grouped count (RB not HB, LEDG/REDG not LE/RE, SAM/MIKE/WILL not
+// LOLB/MLB/ROLB).
+const GAME_POSITION_LABELS = {
+  QB: 'QB', HB: 'RB', FB: 'FB', WR: 'WR', TE: 'TE',
+  LT: 'LT', LG: 'LG', C: 'C', RG: 'RG', RT: 'RT',
+  LE: 'LEDG', RE: 'REDG', DT: 'DT',
+  LOLB: 'SAM', MLB: 'MIKE', ROLB: 'WILL',
+  CB: 'CB', FS: 'FS', SS: 'SS', K: 'K', P: 'P',
+};
+function gamePositionLabel(pos) {
+  return GAME_POSITION_LABELS[pos] || pos;
+}
+
+// ===== Roster tab =====
+let rosterSavePath = null;
+let rosterTeamList = [];
+let rosterInitialized = false;
+
+function initRosterTabOnce() {
+  if (rosterInitialized) return;
+  rosterInitialized = true;
+
+  document.getElementById('roster-select-save-btn').addEventListener('click', async () => {
+    const filePath = await window.api.selectSaveFile();
+    if (!filePath) return;
+    rosterSavePath = filePath;
+    document.getElementById('roster-save-path').textContent = filePath;
+    document.getElementById('roster-save-path').classList.add('selected');
+
+    const select = document.getElementById('roster-team-select');
+    select.disabled = true;
+    select.innerHTML = '<option>Loading teams...</option>';
+    try {
+      rosterTeamList = await window.api.listRealTeams(filePath);
+      select.innerHTML = '';
+      rosterTeamList.forEach((t) => {
+        const opt = document.createElement('option');
+        opt.value = t.teamIndex;
+        opt.textContent = t.name + (t.isUserControlled ? ' (User)' : '');
+        select.appendChild(opt);
+      });
+      select.disabled = false;
+      if (rosterTeamList.length > 0) loadAndRenderRoster(rosterTeamList[0].teamIndex);
+    } catch (err) {
+      select.innerHTML = '<option>Failed to load teams</option>';
+      alert('Failed to list teams: ' + err.message);
+    }
+  });
+
+  document.getElementById('roster-team-select').addEventListener('change', (e) => {
+    loadAndRenderRoster(Number(e.target.value));
+  });
+}
+
+async function loadAndRenderRoster(teamIndex) {
+  const header = document.getElementById('roster-header');
+  const tbody = document.getElementById('roster-table-body');
+  const departedSection = document.getElementById('roster-departed-section');
+  const departedBody = document.getElementById('roster-departed-table-body');
+  const historyNote = document.getElementById('roster-history-note');
+  tbody.innerHTML = '';
+  departedBody.innerHTML = '';
+  departedSection.hidden = true;
+  header.hidden = true;
+  historyNote.hidden = true;
+
+  let roster;
+  try {
+    roster = await window.api.getTeamRoster(rosterSavePath, teamIndex);
+  } catch (err) {
+    alert('Failed to load roster: ' + err.message);
+    return;
+  }
+
+  header.hidden = false;
+  const logoImg = document.getElementById('roster-logo');
+  const src = logoSrcFor(roster.teamName);
+  if (src) {
+    logoImg.src = src;
+    logoImg.style.display = '';
+    logoImg.onerror = () => { logoImg.style.display = 'none'; };
+  } else {
+    logoImg.style.display = 'none';
+  }
+  document.getElementById('roster-name').textContent = roster.teamName;
+  document.getElementById('roster-schemes').textContent =
+    `${formatScheme(roster.offScheme)} Offense / ${formatScheme(roster.defScheme)} Defense`;
+  header.style.borderLeftColor = primaryColorFor(roster.teamName);
+
+  // Live, in-session check only -- not pulled from persisted History.
+  // Resets on app restart on purpose; this answers "did the run I just
+  // made do what I expected," not "what happened days ago."
+  const lastRun = await window.api.getLastRunMoves();
+
+  const arrivedNames = new Set();
+  const departed = [];
+  if (lastRun && lastRun.savePath === rosterSavePath) {
+    for (const m of lastRun.moves) {
+      if (m.to === roster.teamName) arrivedNames.add(m.player);
+      if (m.from === roster.teamName) departed.push(m);
+    }
+    historyNote.hidden = false;
+    historyNote.textContent = `Comparing against the run you just made on this save (${new Date(lastRun.date).toLocaleString()}).`;
+  } else {
+    historyNote.hidden = false;
+    historyNote.textContent = lastRun
+      ? "Your last run in this session was against a different save -- showing current roster only."
+      : 'No run made yet this session -- showing current roster only.';
+  }
+
+  for (const p of roster.players) {
+    const row = document.createElement('tr');
+    const isNew = arrivedNames.has(p.name);
+    row.innerHTML = `
+      <td>${p.name}</td>
+      <td>${gamePositionLabel(p.position)}</td>
+      <td>${p.ovr}</td>
+      <td>${p.schoolYear}</td>
+      <td>${isNew ? '<span class="roster-badge-new">NEW</span>' : ''}</td>
+    `;
+    tbody.appendChild(row);
+  }
+
+  if (departed.length > 0) {
+    departedSection.hidden = false;
+    for (const m of departed) {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${m.player}</td>
+        <td>${gamePositionLabel(m.position)}</td>
+        <td>${m.ovr}</td>
+        <td>${m.to}</td>
+      `;
+      departedBody.appendChild(row);
+    }
   }
 }
 

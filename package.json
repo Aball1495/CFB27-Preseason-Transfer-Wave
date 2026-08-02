@@ -1,6 +1,6 @@
 {
   "name": "preseason-transfer-wave",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Preseason roster redistribution tool for EA Sports College Football 27 CPU teams",
   "main": "main.js",
   "scripts": {
