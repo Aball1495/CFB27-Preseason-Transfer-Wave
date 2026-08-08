@@ -82,6 +82,27 @@ function defaultSettings() {
     // this threshold at all; a surplus is a routine, self-correcting
     // situation, not a sign the league needs attention.
     driftWarningThreshold: 10,
+    // Buried, genuinely good players (3rd-or-lower on their own team's
+    // depth chart) can transfer to find real playing time -- up or down
+    // in prestige, same cap magnitude both ways. Defaults OFF -- this is
+    // a new mechanic, extensively validated via standalone test scripts
+    // first, but never yet run through a real Apply in the live app.
+    // bigFishChance defaults to 0 -- the rare "big fish, small pond"
+    // override that lets a much bigger downward jump through anyway;
+    // 0 means it can never fire until explicitly turned up.
+    enableWaterfall: false,
+    waterfallBigFishChance: 0,
+    // Same concentration problem Tier 2's own cap solves -- without
+    // this, a handful of rock-bottom-prestige teams can end up
+    // net-absorbing far more than their share across many SEPARATE
+    // waterfall chains in one run, even though each chain's own
+    // accounting is individually correct. Same conservative default as
+    // Tier 2's cap.
+    waterfallRecipientCapPerPosition: 1,
+    // A QB's own OVR clearing this threshold qualifies them as a rank-2
+    // waterfall candidate regardless of the starter's class. Scalable,
+    // per request -- start at 90, adjust from here if warranted.
+    waterfallQbOvrThreshold: 90,
   };
 }
 
@@ -363,6 +384,7 @@ ipcMain.on('start-run', async (event, { savePath, dryRun }) => {
         totalMoves: summary.moves.length,
         tier1Count: summary.tier1Count,
         tier2Count: summary.tier2Count,
+        waterfallCount: summary.waterfallCount,
         topTwoExceptionCount: summary.topTwoExceptionCount,
         affectedTeamCount: summary.affectedTeamCount,
         byCheck: summary.byCheck,

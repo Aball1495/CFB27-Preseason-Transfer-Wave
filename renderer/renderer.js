@@ -170,6 +170,8 @@ const summaryEl = document.getElementById('summary');
 const summaryTotal = document.getElementById('summary-total');
 const summaryTier1 = document.getElementById('summary-tier1');
 const summaryTier2 = document.getElementById('summary-tier2');
+const summaryWaterfallCard = document.getElementById('summary-waterfall-card');
+const summaryWaterfall = document.getElementById('summary-waterfall');
 const summaryTeams = document.getElementById('summary-teams');
 const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
@@ -368,6 +370,8 @@ window.api.onComplete((summary) => {
   summaryTotal.textContent = summary.moves.length;
   summaryTier1.textContent = summary.tier1Count;
   summaryTier2.textContent = summary.tier2Count;
+  summaryWaterfallCard.hidden = !summary.waterfallCount;
+  summaryWaterfall.textContent = summary.waterfallCount || 0;
   summaryTeams.textContent = summary.affectedTeamCount;
 
   if (summary.outputPath) {
@@ -430,6 +434,10 @@ async function loadSettingsUI() {
   setTier2Enabled(currentSettings.enableTier2);
   document.getElementById('prestige-cap-input').value = currentSettings.prestigeGapCap;
   document.getElementById('tier2-recipient-cap-input').value = currentSettings.tier2RecipientCapPerPosition ?? 1;
+  document.getElementById('enable-waterfall-checkbox').checked = currentSettings.enableWaterfall ?? false;
+  document.getElementById('waterfall-bigfish-input').value = currentSettings.waterfallBigFishChance ?? 0;
+  document.getElementById('waterfall-recipient-cap-input').value = currentSettings.waterfallRecipientCapPerPosition ?? 1;
+  document.getElementById('waterfall-qb-ovr-threshold-input').value = currentSettings.waterfallQbOvrThreshold ?? 90;
   document.getElementById('drift-threshold-input').value = currentSettings.driftWarningThreshold ?? 10;
   document.getElementById('zero-nil-checkbox').checked = currentSettings.zeroNil;
 }
@@ -476,6 +484,10 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
     severeThresholdOverrides,
     prestigeGapCap: Number(document.getElementById('prestige-cap-input').value),
     tier2RecipientCapPerPosition: Number(document.getElementById('tier2-recipient-cap-input').value),
+    enableWaterfall: document.getElementById('enable-waterfall-checkbox').checked,
+    waterfallBigFishChance: Number(document.getElementById('waterfall-bigfish-input').value),
+    waterfallRecipientCapPerPosition: Number(document.getElementById('waterfall-recipient-cap-input').value),
+    waterfallQbOvrThreshold: Number(document.getElementById('waterfall-qb-ovr-threshold-input').value),
     driftWarningThreshold: Number(document.getElementById('drift-threshold-input').value),
     zeroNil: document.getElementById('zero-nil-checkbox').checked,
   };
@@ -488,7 +500,7 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
 
 document.getElementById('reset-settings-btn').addEventListener('click', async () => {
   if (!confirm('Reset all settings to defaults?')) return;
-  currentSettings = { thresholdOverrides: {}, enableTier2: true, severeThresholdOverrides: {}, prestigeGapCap: 3, tier2RecipientCapPerPosition: 1, driftWarningThreshold: 10, zeroNil: true };
+  currentSettings = { thresholdOverrides: {}, enableTier2: true, severeThresholdOverrides: {}, prestigeGapCap: 3, tier2RecipientCapPerPosition: 1, driftWarningThreshold: 10, zeroNil: true, enableWaterfall: false, waterfallBigFishChance: 0, waterfallRecipientCapPerPosition: 1, waterfallQbOvrThreshold: 90 };
   await window.api.saveSettings(currentSettings);
   await loadSettingsUI();
 });
@@ -563,6 +575,7 @@ async function renderHistory() {
       <td>${entry.totalMoves}</td>
       <td>${entry.tier1Count}</td>
       <td>${entry.tier2Count}</td>
+      <td>${entry.waterfallCount ?? '—'}</td>
       <td>${entry.affectedTeamCount}</td>
       <td></td>
       <td></td>

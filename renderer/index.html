@@ -55,6 +55,10 @@
           <div class="summary-value" id="summary-tier2">0</div>
           <div class="summary-label">Tier 2 (Trim Surplus)</div>
         </div>
+        <div class="summary-card" id="summary-waterfall-card" hidden>
+          <div class="summary-value" id="summary-waterfall">0</div>
+          <div class="summary-label">Waterfall</div>
+        </div>
         <div class="summary-card">
           <div class="summary-value" id="summary-teams">0</div>
           <div class="summary-label">Teams Affected</div>
@@ -131,14 +135,18 @@
             would almost never trigger for them, but every position (including those three) can be tuned individually.
           </p>
           <div class="settings-row">
-            <label for="prestige-cap-input">Prestige gap cap for Tier 2 moves:</label>
+            <label for="prestige-cap-input">Prestige gap cap for Tier 2 &amp; Waterfall moves:</label>
             <input type="number" id="prestige-cap-input" min="0" step="1" />
           </div>
           <p class="section-hint">
-            Tier 2 tries to keep moves realistic — a bench player from a small program shouldn't just teleport onto a
-            national title contender. This caps how much higher-prestige the <em>receiving</em> team can be than the
-            <em>donating</em> team. A player who'd immediately rank in the top 2 at their position on the new team skips
-            this cap entirely (a real, portal-worthy talent upgrade is allowed to jump further than an ordinary depth move).
+            Tier 2 and Waterfall moves both respect a prestige gap — a player can't land somewhere dramatically
+            different in prestige from where they came from. This cap applies in both directions: a bench player
+            from a small program shouldn't teleport onto a national title contender, and a player from a powerhouse
+            program shouldn't be dumped at the bottom of the rankings either. The big fish, small pond exception
+            can still push past this cap downward at low odds when a player clearly deserves a better opportunity
+            than the normal window allows. A player who'd immediately rank in the top 2 at their position on the
+            new team skips this cap entirely on the upward side — a real, portal-worthy talent upgrade is allowed
+            to jump further than an ordinary depth move.
           </p>
           <div class="settings-row">
             <label for="tier2-recipient-cap-input">Max Tier 2 players any one team can absorb per position, per run:</label>
@@ -153,6 +161,52 @@
             backlog faster at the cost of some concentration.
           </p>
         </div>
+
+        <div class="settings-row checkbox-row experimental-row">
+          <input type="checkbox" id="enable-waterfall-checkbox" />
+          <label for="enable-waterfall-checkbox">Enable Transfer Waterfall (experimental)</label>
+        </div>
+        <p class="hint experimental-hint">
+          A player buried 3rd-or-lower on their own team's depth chart can transfer to find real playing time --
+          up OR down in prestige, using the same cap above in both directions. A move can cascade: whoever the
+          incoming player displaces becomes the next candidate, evaluated the same way, until a landing spot
+          doesn't push anyone else down further. A player can never leave if doing so would drop their team below
+          its own minimum at that position -- max is never checked on the arrival side, since a team ending up
+          over max this way is treated the same as ordinary Tier 2 surplus, not a problem to prevent. Extensively
+          validated via standalone test scripts before this integration, but this is its first time running
+          inside a real Apply in the live app -- defaults off.
+        </p>
+        <div class="settings-row" id="waterfall-bigfish-row">
+          <label for="waterfall-bigfish-input">"Big fish, small pond" chance (%):</label>
+          <input type="number" id="waterfall-bigfish-input" min="0" max="100" step="1" />
+        </div>
+        <p class="section-hint">
+          A rare chance for a much bigger downward jump than the normal cap allows -- a genuine blue-blood backup
+          occasionally landing somewhere far smaller, just to finally start. Defaults to 0 (can never fire) until
+          turned up.
+        </p>
+        <div class="settings-row">
+          <label for="waterfall-recipient-cap-input">Max waterfall arrivals any one team can absorb per position, per run:</label>
+          <input type="number" id="waterfall-recipient-cap-input" min="1" step="1" />
+        </div>
+        <p class="section-hint">
+          Same problem the Tier 2 recipient cap already solves -- without this, a handful of rock-bottom-prestige
+          teams can end up net-absorbing far more than their share across many SEPARATE chains in one run (confirmed
+          on a real save), even though each chain's own accounting is individually correct. Once a team hits this
+          cap at a given position, later chains this run route around it instead. Same conservative default (1) as
+          the Tier 2 cap.
+        </p>
+        <div class="settings-row">
+          <label for="waterfall-qb-ovr-threshold-input">QB rank-2 OVR threshold (plays regardless of class):</label>
+          <input type="number" id="waterfall-qb-ovr-threshold-input" min="1" max="99" step="1" />
+        </div>
+        <p class="section-hint">
+          A backup QB rated at or above this OVR can transfer to find real playing time even if the starter ahead
+          of them is OLDER and would otherwise graduate on their own -- a 90+ QB sitting is real wasted talent
+          regardless of who's ahead of them; most teams would take that player right now. QB only, deliberately --
+          there's one football and one starter, so a backup gets essentially zero meaningful snaps no matter his
+          own class, which isn't true anywhere else on the roster. Starts at 90; adjust if warranted.
+        </p>
 
         <h2 class="section-title">Other Options</h2>
         <div class="settings-row">
@@ -218,7 +272,7 @@
         <p class="section-hint">Every time you click Apply, a record is saved here -- a good way to see whether the league is trending toward balance over time.</p>
         <div id="history-chart" class="history-chart"></div>
         <table class="history-table" id="history-table">
-          <thead><tr><th>Date</th><th>Total</th><th>Tier 1</th><th>Tier 2</th><th>Teams Affected</th><th></th><th></th></tr></thead>
+          <thead><tr><th>Date</th><th>Total</th><th>Tier 1</th><th>Tier 2</th><th>Waterfall</th><th>Teams Affected</th><th></th><th></th></tr></thead>
           <tbody id="history-table-body"></tbody>
         </table>
         <p id="history-empty" class="section-hint" hidden>No runs recorded yet -- click Apply on the Run tab to start tracking history.</p>
